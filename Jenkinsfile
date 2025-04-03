@@ -48,13 +48,23 @@ pipeline {
                             // First build the application with Maven
                             sh "./mvnw clean package -DskipTests"
                             
+                            // Debug: List contents of target directory
+                            sh "ls -la target/"
+                            
                             def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
                             echo "Building image for ${service} with tag ${tag}"
+                            
+                            // Find the actual JAR file
+                            def jarFile = sh(script: "ls target/*.jar", returnStdout: true).trim()
+                            echo "Found JAR file: ${jarFile}"
+                            
+                            // Copy the JAR file to a known location
+                            sh "cp ${jarFile} target/app.jar"
                             
                             // Pass the correct artifact name to Docker build
                             sh """
                             docker build -f docker/Dockerfile \
-                                --build-arg ARTIFACT_NAME=target/spring-petclinic-${service} \
+                                --build-arg ARTIFACT_NAME=target/app \
                                 --build-arg EXPOSED_PORT=8080 \
                                 -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag} .
                             """
