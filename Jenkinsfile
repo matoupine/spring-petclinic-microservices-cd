@@ -13,11 +13,12 @@ pipeline {
         SERVICES = "eureka-service admin-server zipkin api-gateway customers-service genai-service vets-service visits-service"
     }
 
+    def COMMIT_IDS = [:]
+
     stages {
         stage('Checkout Code') {
             steps {
                 script {
-                    def COMMIT_IDS = [:]  
                     def branchMap = [
                         'customers-service': params.CUSTOMERS_SERVICE_BRANCH,
                         'visits-service': params.VISITS_SERVICE_BRANCH,
