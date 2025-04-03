@@ -2,27 +2,37 @@ pipeline {
     agent any
 
     parameters {
-        string(name: 'SERVICE_NAME', defaultValue: 'vets-service', description: 'Service to deploy (e.g., vets-service)')
-        string(name: 'SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for the specified service (e.g., dev_vets_service)')
+        string(name: 'CUSTOMERS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for customers-service (e.g., dev_customers_service)')
+        string(name: 'VISITS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for visits-service (e.g., dev_visits_service)')
+        string(name: 'VETS_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for vets-service (e.g., dev_vets_service)')
+        string(name: 'GENAI_SERVICE_BRANCH', defaultValue: 'main', description: 'Branch for genai-service (e.g., dev_genai_service)')
     }
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         SERVICES = "eureka-service admin-server zipkin api-gateway customers-service genai-service vets-service visits-service"
-        COMMIT_ID = ''
+        COMMIT_IDS = [:] // Map to store commit IDs for each service
     }
 
     stages {
         stage('Checkout Code') {
             steps {
                 script {
-                    // Checkout the specified branch for the selected service
-                    COMMIT_ID = checkoutService(params.SERVICE_NAME, params.SERVICE_BRANCH)
-                    // Checkout main branch for other services
+                    // Map service names to their respective branch parameters
+                    def branchMap = [
+                        'customers-service': params.CUSTOMERS_SERVICE_BRANCH,
+                        'visits-service': params.VISITS_SERVICE_BRANCH,
+                        'vets-service': params.VETS_SERVICE_BRANCH,
+                        'genai-service': params.GENAI_SERVICE_BRANCH,
+                        'eureka-service': 'main',
+                        'admin-server': 'main',
+                        'zipkin': 'main',
+                        'api-gateway': 'main'
+                    ]
+
+                    // Checkout code for each service and store the commit ID
                     for (service in SERVICES.split()) {
-                        if (service != params.SERVICE_NAME) {
-                            checkoutService(service, 'main')
-                        }
+                        COMMIT_IDS[service] = checkoutService(service, branchMap[service])
                     }
                 }
             }
@@ -33,8 +43,9 @@ pipeline {
                 script {
                     for (service in SERVICES.split()) {
                         dir(service) {
-                            def tag = (service == params.SERVICE_NAME) ? COMMIT_ID : 'latest'
-                            sh "docker build -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag} ."
+                            def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
+                            // Chỉ định đường dẫn tới Dockerfile trong thư mục docker/
+                            sh "docker build -f docker/Dockerfile -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag} ."
                             sh """
                             docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
                             docker push ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag}
@@ -51,8 +62,12 @@ pipeline {
                     // Create a Helm values file dynamically
                     writeFile file: 'values.yaml', text: """
                     services:
+                      eureka-service:
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-eureka-service:latest
                       admin-server:
                         image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-admin-server:latest
+                      zipkin:
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-zipkin:latest
                       api-gateway:
                         image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-api-gateway:latest
                         service:
@@ -60,13 +75,13 @@ pipeline {
                           port: 80
                           nodePort: 30080
                       customers-service:
-                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-customers-service:latest                            
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-customers-service:${COMMIT_IDS['customers-service'] ?: 'latest'}
                       genai-service:
-                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-genai-service:latest
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-genai-service:${COMMIT_IDS['genai-service'] ?: 'latest'}
                       vets-service:
-                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-vets-service:${params.SERVICE_NAME == 'vets-service' ? COMMIT_ID : 'latest'}
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-vets-service:${COMMIT_IDS['vets-service'] ?: 'latest'}
                       visits-service:
-                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-visits-service:latest
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-visits-service:${COMMIT_IDS['visits-service'] ?: 'latest'}
                     """
                     // Deploy using Helm
                     sh "helm upgrade --install petclinic ./helm-chart -f values.yaml --namespace developer --create-namespace"
@@ -108,6 +123,7 @@ def checkoutService(String service, String branch) {
                 credentialsId: 'jenkins-petclinic'
             ]]
         ])
-        return sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        return (branch == 'main') ? 'main' : commitId
     }
 }

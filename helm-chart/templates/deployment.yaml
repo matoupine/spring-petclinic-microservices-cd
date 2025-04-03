@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.services.customers-service.name | default "customers-service" }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: customers-service
+  template:
+    metadata:
+      labels:
+        app: customers-service
+    spec:
+      containers:
+      - name: customers-service
+        image: {{ .Values.services.customers-service.image }}
+        ports:
+        - containerPort: 8080
