@@ -29,7 +29,7 @@ pipeline {
             steps {
                 script {
                     def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.build("${DOCKER_IMAGE}:${commitId}")
+                    sh "sudo docker build -t ${DOCKER_IMAGE}:${commitId} ."
                 }
             }
         }
@@ -38,9 +38,10 @@ pipeline {
             steps {
                 script {
                     def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.withRegistry('https://registry.hub.docker.com', 'DOCKERHUB_CREDENTIALS') {
-                        docker.image("${DOCKER_IMAGE}:${commitId}").push()
-                    }
+                    sh """
+                    sudo docker login -u \${DOCKERHUB_CREDENTIALS_USR} -p \${DOCKERHUB_CREDENTIALS_PSW}
+                    sudo docker push ${DOCKER_IMAGE}:${commitId}
+                    """
                 }
             }
         }
@@ -50,8 +51,8 @@ pipeline {
                 script {
                     def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     sh """
-                    kubectl set image deployment/spring-petclinic vets-service=${DOCKER_IMAGE}:${commitId}
-                    kubectl rollout status deployment/spring-petclinic
+                    sudo kubectl set image deployment/spring-petclinic vets-service=${DOCKER_IMAGE}:${commitId}
+                    sudo kubectl rollout status deployment/spring-petclinic
                     """
                 }
             }
