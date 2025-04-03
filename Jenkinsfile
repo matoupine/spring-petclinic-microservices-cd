@@ -17,8 +17,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 script {
-                def COMMIT_IDS = [:]  // ✅ Đưa biến này vào trong script block
-                def branchMap = [
+                    def COMMIT_IDS = [:]  
                     def branchMap = [
                         'customers-service': params.CUSTOMERS_SERVICE_BRANCH,
                         'visits-service': params.VISITS_SERVICE_BRANCH,
@@ -29,13 +28,12 @@ pipeline {
                         'zipkin': 'main',
                         'api-gateway': 'main'
                     ]
-                    SERVICES.split().each { service ->  // ✅ Sử dụng each thay vì for-in
+                    SERVICES.split().each { service ->  
                         COMMIT_IDS[service] = checkoutService(service, branchMap[service])
                     }
                 }
             }
         }
-
         stage('Build and Push Images') {
             steps {
                 script {
