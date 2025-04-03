@@ -11,13 +11,14 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         SERVICES = "eureka-service admin-server zipkin api-gateway customers-service genai-service vets-service visits-service"
-        COMMIT_IDS = [:]
     }
 
     stages {
         stage('Checkout Code') {
             steps {
                 script {
+                def COMMIT_IDS = [:]  // ✅ Đưa biến này vào trong script block
+                def branchMap = [
                     def branchMap = [
                         'customers-service': params.CUSTOMERS_SERVICE_BRANCH,
                         'visits-service': params.VISITS_SERVICE_BRANCH,
