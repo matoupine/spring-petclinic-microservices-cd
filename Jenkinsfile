@@ -13,7 +13,9 @@ pipeline {
         SERVICES = "eureka-service admin-server zipkin api-gateway customers-service genai-service vets-service visits-service"
     }
 
-    def COMMIT_IDS = [:]
+    script {
+        def COMMIT_IDS = [:]
+    }
 
     stages {
         stage('Checkout Code') {
