@@ -43,11 +43,22 @@ pipeline {
         stage('Build and Push Images') {
             steps {
                 script {
-                    SERVICES.split().each { service ->  // ✅ Sửa vòng lặp
+                    SERVICES.split().each { service ->
                         dir(service) {
+                            // First build the application with Maven
+                            sh "./mvnw clean package -DskipTests"
+                            
                             def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
                             echo "Building image for ${service} with tag ${tag}"
-                            sh "docker build -f docker/Dockerfile -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag} ."
+                            
+                            // Pass the correct artifact name to Docker build
+                            sh """
+                            docker build -f docker/Dockerfile \
+                                --build-arg ARTIFACT_NAME=target/spring-petclinic-${service} \
+                                --build-arg EXPOSED_PORT=8080 \
+                                -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag} .
+                            """
+                            
                             sh """
                             docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
                             docker push ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag}
