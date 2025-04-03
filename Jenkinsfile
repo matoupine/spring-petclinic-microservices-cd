@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        SERVICES = "eureka-service admin-server zipkin api-gateway customers-service genai-service vets-service visits-service"
+        SERVICES = "spring-petclinic-admin-server spring-petclinic-api-gateway spring-petclinic-discovery-server spring-petclinic-customers-service spring-petclinic-genai-service spring-petclinic-vets-service spring-petclinic-visits-service"
     }
 
     stages {
@@ -25,14 +25,13 @@ pipeline {
             steps {
                 script {
                     def branchMap = [
-                        'customers-service': params.CUSTOMERS_SERVICE_BRANCH,
-                        'visits-service': params.VISITS_SERVICE_BRANCH,
-                        'vets-service': params.VETS_SERVICE_BRANCH,
-                        'genai-service': params.GENAI_SERVICE_BRANCH,
-                        'eureka-service': 'main',
-                        'admin-server': 'main',
-                        'zipkin': 'main',
-                        'api-gateway': 'main'
+                        'spring-petclinic-customers-service': params.CUSTOMERS_SERVICE_BRANCH,
+                        'spring-petclinic-visits-service': params.VISITS_SERVICE_BRANCH,
+                        'spring-petclinic-vets-service': params.VETS_SERVICE_BRANCH,
+                        'spring-petclinic-genai-service': params.GENAI_SERVICE_BRANCH,
+                        'spring-petclinic-discovery-server': 'main',
+                        'spring-petclinic-admin-server': 'main',
+                        'spring-petclinic-api-gateway': 'main'
                     ]
                     SERVICES.split().each { service ->  
                         COMMIT_IDS[service] = checkoutService(service, branchMap[service])
@@ -45,33 +44,26 @@ pipeline {
                 script {
                     SERVICES.split().each { service ->
                         dir(service) {
-                            // First build the application with Maven
+                            // Build with Maven
+                            sh "chmod +x ./mvnw"
                             sh "./mvnw clean package -DskipTests"
-                            
-                            // Debug: List contents of target directory
-                            sh "ls -la target/"
                             
                             def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
                             echo "Building image for ${service} with tag ${tag}"
                             
-                            // Find the actual JAR file
-                            def jarFile = sh(script: "ls target/*.jar", returnStdout: true).trim()
-                            echo "Found JAR file: ${jarFile}"
+                            // Get the service name without the prefix for Docker image
+                            def shortName = service.replace('spring-petclinic-', '')
                             
-                            // Copy the JAR file to a known location
-                            sh "cp ${jarFile} target/app.jar"
-                            
-                            // Pass the correct artifact name to Docker build
                             sh """
                             docker build -f docker/Dockerfile \
-                                --build-arg ARTIFACT_NAME=target/app \
+                                --build-arg ARTIFACT_NAME=target/${service}-0.0.1-SNAPSHOT \
                                 --build-arg EXPOSED_PORT=8080 \
-                                -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag} .
+                                -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${shortName}:${tag} .
                             """
                             
                             sh """
                             docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
-                            docker push ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag}
+                            docker push ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${shortName}:${tag}
                             """
                         }
                     }
@@ -97,13 +89,13 @@ pipeline {
                           port: 80
                           nodePort: 30080
                       customers-service:
-                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-customers-service:${COMMIT_IDS['customers-service'] ?: 'latest'}
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-customers-service:${COMMIT_IDS['spring-petclinic-customers-service'] ?: 'latest'}
                       genai-service:
-                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-genai-service:${COMMIT_IDS['genai-service'] ?: 'latest'}
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-genai-service:${COMMIT_IDS['spring-petclinic-genai-service'] ?: 'latest'}
                       vets-service:
-                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-vets-service:${COMMIT_IDS['vets-service'] ?: 'latest'}
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-vets-service:${COMMIT_IDS['spring-petclinic-vets-service'] ?: 'latest'}
                       visits-service:
-                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-visits-service:${COMMIT_IDS['visits-service'] ?: 'latest'}
+                        image: ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-visits-service:${COMMIT_IDS['spring-petclinic-visits-service'] ?: 'latest'}
                     """
                     sh "helm upgrade --install petclinic ./helm-chart -f values.yaml --namespace developer --create-namespace"
                 }
