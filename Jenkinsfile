@@ -110,7 +110,7 @@ def checkoutService(String service, String branch) {
             branches: [[name: "*/${branch}"]],
             userRemoteConfigs: [[
                 url: "https://github.com/spring-petclinic/spring-petclinic-microservices.git",
-                credentialsId: 'jenkins-petclinic'
+                credentialsId: 'jenkins-petclinic-cd'
             ]]
         ])
         def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
