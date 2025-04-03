@@ -17,7 +17,7 @@ pipeline {
                         extensions: [],
                         submoduleCfg: [],
                         userRemoteConfigs: [[
-                            url: 'https://github.com/matoupine/spring-petclinic-microservices.git',
+                            url: 'https://github.com/matoupine/spring-petclinic-microservices-cd.git',
                             credentialsId: 'jenkins-petclinic-cd'
                         ]]
                     ])
