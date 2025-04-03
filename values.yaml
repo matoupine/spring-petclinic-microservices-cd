@@ -1,0 +1,16 @@
+services:
+  admin-server:
+    image: spring-petclinic-admin-server:latest
+  api-gateway:
+    image: spring-petclinic-api-gateway:latest
+    service:
+      type: ClusterIP
+      port: 80
+  customers-service:
+    image: spring-petclinic-customers-service:latest
+  genai-service:
+    image: spring-petclinic-genai-service:latest
+  vets-service:
+    image: spring-petclinic-vets-service:latest
+  visits-service:
+    image: spring-petclinic-visits-service:latest
