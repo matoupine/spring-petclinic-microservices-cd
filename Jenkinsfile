@@ -29,7 +29,7 @@ pipeline {
                         'zipkin': 'main',
                         'api-gateway': 'main'
                     ]
-                    for (service in SERVICES.split()) {
+                    SERVICES.split().each { service ->  // ✅ Sử dụng each thay vì for-in
                         COMMIT_IDS[service] = checkoutService(service, branchMap[service])
                     }
                 }
@@ -39,10 +39,9 @@ pipeline {
         stage('Build and Push Images') {
             steps {
                 script {
-                    for (service in SERVICES.split()) {
+                    SERVICES.split().each { service ->  // ✅ Sửa vòng lặp
                         dir(service) {
                             def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
-                            // Chỉ định đường dẫn tới Dockerfile trong thư mục docker/
                             sh "docker build -f docker/Dockerfile -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag} ."
                             sh """
                             docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
