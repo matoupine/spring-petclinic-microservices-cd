@@ -43,7 +43,7 @@ pipeline {
                         def commitId = COMMIT_IDS[service] ?: 'latest'
                         def moduleName = "spring-petclinic-${service}"
                         def sourceImage = "springcommunity/${moduleName}:latest"
-                        def targetImage = "${DOCKERHUB_CREDENTIALS_USR}/${moduleName}:${tag}"
+                        def targetImage = "${DOCKERHUB_CREDENTIALS_USR}/${moduleName}:${commitId}"
 
                         echo "🐳 Building Docker image for ${service} using Maven"
                         sh "./mvnw clean install -PbuildDocker -pl ${moduleName}"
@@ -60,7 +60,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('Deploy to Kubernetes with Helm') {
             steps {
@@ -117,4 +116,3 @@ def checkoutService(String service, String branch) {
         return sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
     }
 }
-
