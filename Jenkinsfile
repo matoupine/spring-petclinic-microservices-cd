@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        SERVICES = "customers-service visits-service vets-service genai-service admin-server config-server api-gateway discovery-server"
+        SERVICES = "customers-service"
     }
 
     stages {
@@ -42,16 +42,25 @@ pipeline {
                     SERVICES.split().each { service ->
                         def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
                         def moduleName = "spring-petclinic-${service}"
+                        def imageName = "${DOCKERHUB_CREDENTIALS_USR}/${moduleName}:${tag}"
 
-                        echo "🐳 Building and pushing Docker image for ${service} using Maven buildDocker profile"
+                        echo "🐳 Building Docker image for ${service} using Maven"
 
-                        sh """
-                            ./mvnw clean install -PbuildDocker -pl ${moduleName} -Ddocker.image.tag=${tag} -Ddocker.username=${DOCKERHUB_CREDENTIALS_USR} -Ddocker.password=${DOCKERHUB_CREDENTIALS_PSW}
-                        """
+                        sh "./mvnw clean install -PbuildDocker -pl ${moduleName}"
+
+                        echo "🔐 Logging in to Docker Hub"
+                        sh "docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}"
+
+                        echo "🏷️ Tagging image as ${imageName}"
+                        sh "docker tag ${moduleName}:latest ${imageName}"
+
+                        echo "📤 Pushing ${imageName} to Docker Hub"
+                        sh "docker push ${imageName}"
                     }
                 }
             }
         }
+
 
         stage('Deploy to Kubernetes with Helm') {
             steps {
