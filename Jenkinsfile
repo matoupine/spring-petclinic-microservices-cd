@@ -139,13 +139,13 @@ def buildAndPushDockerImage(String service, String tag, String port) {
     }
 }
 
-def getJarArtifactName() {
+def getJarArtifactName(String service) {
     dir(service) {
         def jarPath = sh(
         script: "ls target/*.jar | grep -v 'original' | head -n 1",
             returnStdout: true
         ).trim()
     }
-    
+
     return jarPath.replaceFirst(/^target\//, '').replaceFirst(/\.jar$/, '')
 }
