@@ -24,7 +24,7 @@ pipeline {
                         'vets-service'     : params.VETS_SERVICE_BRANCH,
                         'genai-service'    : params.GENAI_SERVICE_BRANCH,
                         'admin-server'     : 'main',
-                        'config-server'    : 'main', 
+                        'config-server'    : 'main' 
                         'api-gateway'      : 'main'
                     ]
                     SERVICES.split().each { service ->
@@ -110,7 +110,7 @@ def checkoutService(String service, String branch) {
                 credentialsId: 'jenkins-petclinic-cd'
             ]]
         ])
-        return sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        return (branch == 'main') ? 'main' : sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
     }
 }
 
