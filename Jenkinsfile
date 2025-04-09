@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        SERVICES = "customers-service"
+        SERVICES = "customers-service visits-service vets-service genai-service admin-server config-server api-gateway discovery-server"
     }
 
     stages {
@@ -40,7 +40,7 @@ pipeline {
             steps {
                 script {
                     SERVICES.split().each { service ->
-                        def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
+                        def commitId = COMMIT_IDS[service] ?: 'latest'
                         def moduleName = "spring-petclinic-${service}"
                         def sourceImage = "springcommunity/${moduleName}:latest"
                         def targetImage = "${DOCKERHUB_CREDENTIALS_USR}/${moduleName}:${tag}"
@@ -114,6 +114,7 @@ def checkoutService(String service, String branch) {
                 credentialsId: 'jenkins-petclinic-cd'
             ]]
         ])
-        return (branch == 'main') ? 'main' : sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        return sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
     }
 }
+
