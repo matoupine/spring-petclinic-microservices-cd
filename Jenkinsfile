@@ -44,9 +44,30 @@ pipeline {
                 script {
                     SERVICES.split().each { service ->
                         dir(service) {
-                            // Build with Maven
-                            sh "chmod +x ./mvnw"
-                            sh "./mvnw clean package -DskipTests"
+                            // Debug: Show current directory
+                            sh "pwd"
+                            sh "ls -la"
+                            
+                            // Check for Maven wrapper files
+                            sh "ls -la .mvn/wrapper/ || echo 'No .mvn/wrapper directory'"
+                            
+                            // Create .mvn/wrapper directory if it doesn't exist
+                            sh """
+                            mkdir -p .mvn/wrapper
+                            if [ ! -f ".mvn/wrapper/maven-wrapper.properties" ]; then
+                                echo "Creating maven-wrapper.properties"
+                                echo "distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.zip" > .mvn/wrapper/maven-wrapper.properties
+                            fi
+                            """
+                            
+                            // Make mvnw executable and run build
+                            sh """
+                            chmod +x ./mvnw
+                            ./mvnw clean package -DskipTests
+                            """
+                            
+                            // Debug: Show target directory contents
+                            sh "ls -la target/"
                             
                             def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
                             echo "Building image for ${service} with tag ${tag}"
@@ -54,9 +75,19 @@ pipeline {
                             // Get the service name without the prefix for Docker image
                             def shortName = service.replace('spring-petclinic-', '')
                             
+                            // Copy the JAR file to a known location
+                            sh """
+                            # Find the actual JAR file (excluding *-tests.jar)
+                            JAR_FILE=\$(find target/ -name "${service}-*.jar" ! -name "*-tests.jar" -type f)
+                            echo "Found JAR file: \${JAR_FILE}"
+                            
+                            # Copy it to a known location
+                            cp \${JAR_FILE} target/application.jar
+                            """
+                            
                             sh """
                             docker build -f docker/Dockerfile \
-                                --build-arg ARTIFACT_NAME=target/${service}-0.0.1-SNAPSHOT \
+                                --build-arg ARTIFACT_NAME=target/application \
                                 --build-arg EXPOSED_PORT=8080 \
                                 -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${shortName}:${tag} .
                             """

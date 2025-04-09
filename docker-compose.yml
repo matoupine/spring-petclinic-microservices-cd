@@ -113,18 +113,18 @@ services:
     ports:
      - 8080:8080
 
-  tracing-server:
-    image: openzipkin/zipkin
-    container_name: tracing-server
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    environment:
-    # Waiting for https://github.com/openzipkin/zipkin/issues/3786
-    - JAVA_OPTS=-XX:UseSVE=0
-    ports:
-     - 9411:9411
+  # tracing-server:
+  #   image: openzipkin/zipkin
+  #   container_name: tracing-server
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 512M
+  #   environment:
+  #   # Waiting for https://github.com/openzipkin/zipkin/issues/3786
+  #   - JAVA_OPTS=-XX:UseSVE=0
+  #   ports:
+  #    - 9411:9411
 
   admin-server:
     image: springcommunity/spring-petclinic-admin-server
@@ -143,22 +143,22 @@ services:
 
   ## Grafana / Prometheus
 
-  grafana-server:
-    build: ./docker/grafana
-    container_name: grafana-server
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    ports:
-    - 3030:3030
+  # grafana-server:
+  #   build: ./docker/grafana
+  #   container_name: grafana-server
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M
+  #   ports:
+  #   - 3030:3030
 
-  prometheus-server:
-    build: ./docker/prometheus
-    container_name: prometheus-server
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    ports:
-    - 9091:9090
+  # prometheus-server:
+  #   build: ./docker/prometheus
+  #   container_name: prometheus-server
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 256M
+  #   ports:
+  #   - 9091:9090
