@@ -24,8 +24,9 @@ pipeline {
                         'vets-service'     : params.VETS_SERVICE_BRANCH,
                         'genai-service'    : params.GENAI_SERVICE_BRANCH,
                         'admin-server'     : 'main',
-                        'config-server'    : 'main' 
-                        'api-gateway'      : 'main'
+                        'config-server'    : 'main',
+                        'api-gateway'      : 'main',
+                        'discovery-server' : 'main'
                     ]
                     SERVICES.split().each { service ->
                         COMMIT_IDS[service] = checkoutService(service, branchMap[service])
@@ -39,14 +40,14 @@ pipeline {
             steps {
                 script {
                     def portMap = [
-                        'eureka-service'    : '8761',
-                        'admin-server'      : '9090',
-                        'zipkin'            : '9411',
-                        'api-gateway'       : '8080',
-                        'customers-service' : '8081',
-                        'genai-service'     : '8087',
-                        'vets-service'      : '8082',
-                        'visits-service'    : '8083'
+                        'customers-service': '8081',
+                        'visits-service'   : '8082',
+                        'vets-service'     : '8083',
+                        'genai-service'    : '8084',
+                        'admin-server'     : '9090',
+                        'config-server'    : '8888',
+                        'api-gateway'      : '8080',
+                        'discovery-server' : '8761'                    
                     ]
 
                     SERVICES.split().each { service ->
