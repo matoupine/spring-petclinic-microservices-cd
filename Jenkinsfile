@@ -10,7 +10,7 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-        SERVICES = "customers-server visits-service vets-service genai-service admin-server config-server api-gateway discovery-server"
+        SERVICES = "customers-service visits-service vets-service genai-service admin-server config-server api-gateway discovery-server"
     }
 
     stages {
