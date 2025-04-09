@@ -120,7 +120,7 @@ def buildAndPushDockerImage(String service, String tag, String port) {
         echo "▶ Building JAR for ${service}"
         sh '../mvnw clean package -DskipTests'
 
-        def artifactName = getJarArtifactName()
+        def artifactName = getJarArtifactName(service)
         echo "▶ Found artifact: ${artifactName}.jar"
 
         echo "🐳 Building Docker image for ${service} with tag ${tag}"
@@ -140,9 +140,12 @@ def buildAndPushDockerImage(String service, String tag, String port) {
 }
 
 def getJarArtifactName() {
-    def jarPath = sh(
+    dir(service) {
+        def jarPath = sh(
         script: "ls target/*.jar | grep -v 'original' | head -n 1",
-        returnStdout: true
-    ).trim()
+            returnStdout: true
+        ).trim()
+    }
+    
     return jarPath.replaceFirst(/^target\//, '').replaceFirst(/\.jar$/, '')
 }
