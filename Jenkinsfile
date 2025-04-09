@@ -36,24 +36,18 @@ pipeline {
             }
         }
 
-        stage('Build & Push Docker Images') {
+        stage('Build & Push Docker Images via Maven') {
             steps {
                 script {
-                    def portMap = [
-                        'customers-service': '8081',
-                        'visits-service'   : '8082',
-                        'vets-service'     : '8083',
-                        'genai-service'    : '8084',
-                        'admin-server'     : '9090',
-                        'config-server'    : '8888',
-                        'api-gateway'      : '8080',
-                        'discovery-server' : '8761'                    
-                    ]
-
                     SERVICES.split().each { service ->
                         def tag = (COMMIT_IDS[service] && COMMIT_IDS[service] != 'main') ? COMMIT_IDS[service] : 'latest'
-                        def port = portMap.get(service, '8080')
-                        buildAndPushDockerImage(service, tag, port)
+                        def moduleName = "spring-petclinic-${service}"
+
+                        echo "🐳 Building and pushing Docker image for ${service} using Maven buildDocker profile"
+
+                        sh """
+                            ./mvnw clean install -PbuildDocker -pl ${moduleName} -Ddocker.image.tag=${tag} -Ddocker.username=${DOCKERHUB_CREDENTIALS_USR} -Ddocker.password=${DOCKERHUB_CREDENTIALS_PSW}
+                        """
                     }
                 }
             }
@@ -113,39 +107,4 @@ def checkoutService(String service, String branch) {
         ])
         return (branch == 'main') ? 'main' : sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
     }
-}
-
-def buildAndPushDockerImage(String service, String tag, String port) {
-    dir(service) {
-        echo "▶ Building JAR for ${service}"
-        sh '../mvnw clean package -DskipTests'
-
-        def artifactName = getJarArtifactName(service)
-        echo "▶ Found artifact: ${artifactName}.jar"
-
-        echo "🐳 Building Docker image for ${service} with tag ${tag}"
-        sh """
-            docker build -f docker/Dockerfile \\
-                --build-arg ARTIFACT_NAME=${artifactName} \\
-                --build-arg EXPOSED_PORT=${port} \\
-                -t ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag} .
-        """
-
-        echo "📤 Pushing image to Docker Hub"
-        sh """
-            docker login -u ${DOCKERHUB_CREDENTIALS_USR} -p ${DOCKERHUB_CREDENTIALS_PSW}
-            docker push ${DOCKERHUB_CREDENTIALS_USR}/spring-petclinic-${service}:${tag}
-        """
-    }
-}
-
-def getJarArtifactName(String service) {
-    dir(service) {
-        def jarPath = sh(
-        script: "ls target/*.jar | grep -v 'original' | head -n 1",
-            returnStdout: true
-        ).trim()
-    }
-
-    return jarPath.replaceFirst(/^target\//, '').replaceFirst(/\.jar$/, '')
 }
