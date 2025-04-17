@@ -1,19 +1,27 @@
+{{- range .Values.services }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.services.customers-service.name | default "customers-service" }}
+  name: {{ .name }}
+  labels:
+    app: {{ .name }}
 spec:
-  replicas: 1
+  replicas: {{ $.Values.replicaCount }}
   selector:
     matchLabels:
-      app: customers-service
+      app: {{ .name }}
   template:
     metadata:
       labels:
-        app: customers-service
+        app: {{ .name }}
     spec:
       containers:
-      - name: customers-service
-        image: {{ .Values.services.customers-service.image }}
+      - name: {{ .name }}
+        image: {{ .image }}
         ports:
-        - containerPort: 8080
+        - containerPort: {{ .port }}
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "docker"
+{{- end }}

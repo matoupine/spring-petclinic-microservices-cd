@@ -1,15 +1,23 @@
+{{- range .Values.services }}
+---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "helm-chart.fullname" . }}
+  name: {{ .name }}
   labels:
-    {{- include "helm-chart.labels" . | nindent 4 }}
+    app: {{ .name }}
 spec:
-  type: {{ .Values.service.type }}
   ports:
-    - port: {{ .Values.service.port }}
-      targetPort: http
-      protocol: TCP
-      name: http
+  - port: {{ .port }}
+    targetPort: {{ .port }}
+    {{- if eq .name "api-gateway" }}
+    nodePort: {{ $.Values.service.nodePort }}
+    {{- end }}
   selector:
-    {{- include "helm-chart.selectorLabels" . | nindent 4 }}
+    app: {{ .name }}
+  {{- if eq .name "api-gateway" }}
+  type: {{ $.Values.service.type }}
+  {{- else }}
+  type: ClusterIP
+  {{- end }}
+{{- end }}
