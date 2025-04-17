@@ -1,0 +1,136 @@
+pipeline {
+  agent any
+
+  parameters {
+    string(name: 'DISCOVERY_BRANCH', defaultValue: 'main', description: 'Branch for discovery-server')
+    string(name: 'CONFIG_BRANCH', defaultValue: 'main', description: 'Branch for config-server')
+    string(name: 'ADMIN_BRANCH', defaultValue: 'main', description: 'Branch for admin-server')
+    string(name: 'API_BRANCH', defaultValue: 'main', description: 'Branch for api-gateway')
+    string(name: 'CUSTOMERS_BRANCH', defaultValue: 'main', description: 'Branch for customers-service')
+    string(name: 'GENAI_BRANCH', defaultValue: 'main', description: 'Branch for genai-service')
+    string(name: 'VETS_BRANCH', defaultValue: 'main', description: 'Branch for vets-service')
+    string(name: 'VISITS_BRANCH', defaultValue: 'main', description: 'Branch for visits-service')
+  }
+
+  environment {
+    DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
+    DOCKERHUB_REPO = 'matoupine' =
+    KUBE_NAMESPACE = 'petclinic-dev'
+  }
+
+  stages {
+    stage('Build and Push Images') {
+      parallel {
+        stage('discovery-server') {
+          steps {
+            script {
+              buildAndPush('discovery-server', params.DISCOVERY_BRANCH)
+            }
+          }
+        }
+        stage('config-server') {
+          steps {
+            script {
+              buildAndPush('config-server', params.CONFIG_BRANCH)
+            }
+          }
+        }
+        stage('admin-server') {
+          steps {
+            script {
+              buildAndPush('admin-server', params.ADMIN_BRANCH)
+            }
+          }
+        }
+        stage('api-gateway') {
+          steps {
+            script {
+              buildAndPush('api-gateway', params.API_BRANCH)
+            }
+          }
+        }
+        stage('customers-service') {
+          steps {
+            script {
+              buildAndPush('customers-service', params.CUSTOMERS_BRANCH)
+            }
+          }
+        }
+        stage('genai-service') {
+          steps {
+            script {
+              buildAndPush('genai-service', params.GENAI_BRANCH)
+            }
+          }
+        }
+        stage('vets-service') {
+          steps {
+            script {
+              buildAndPush('vets-service', params.VETS_BRANCH)
+            }
+          }
+        }
+        stage('visits-service') {
+          steps {
+            script {
+              buildAndPush('visits-service', params.VISITS_BRANCH)
+            }
+          }
+        }
+      }
+    }
+
+    stage('Deploy with Helm') {
+      steps {
+        script {
+          def imageTags = [
+            'discovery-server': getCommitId(params.DISCOVERY_BRANCH),
+            'config-server': getCommitId(params.CONFIG_BRANCH),
+            'admin-server': getCommitId(params.ADMIN_BRANCH),
+            'api-gateway': getCommitId(params.API_BRANCH),
+            'customers-service': getCommitId(params.CUSTOMERS_BRANCH),
+            'genai-service': getCommitId(params.GENAI_BRANCH),
+            'vets-service': getCommitId(params.VETS_BRANCH),
+            'visits-service': getCommitId(params.VISITS_BRANCH)
+          ]
+
+          def helmSetArgs = imageTags.collect { service, tag ->
+            "--set services[?(@.name=='${service}')].image=${DOCKERHUB_REPO}/${service}:${tag}"
+          }.join(' ')
+
+          sh """
+            helm upgrade --install petclinic ./charts/petclinic \
+              --namespace ${KUBE_NAMESPACE} \
+              --create-namespace \
+              ${helmSetArgs}
+          """
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Deployment successful. Access the application via NodePort."
+    }
+  }
+}
+
+def buildAndPush(serviceName, branchName) {
+  def repoUrl = "https://github.com/matoupine/spring-petclinic-microservices-cd.git"
+  def commitId = getCommitId(branchName)
+
+  dir("${serviceName}") {
+    git branch: branchName, url: repoUrl
+    sh "docker build -t ${DOCKERHUB_REPO}/${serviceName}:${commitId} ."
+    withDockerRegistry([credentialsId: DOCKERHUB_CREDENTIALS, url: '']) {
+      sh "docker push ${DOCKERHUB_REPO}/${serviceName}:${commitId}"
+    }
+  }
+}
+
+def getCommitId(branchName) {
+  def repoUrl = "https://github.com/matoupine/spring-petclinic-microservices-cd.git"
+  def commitId = sh(script: "git ls-remote ${repoUrl} refs/heads/${branchName} | cut -f1", returnStdout: true).trim()
+  return commitId.substring(0, 7)
+}
