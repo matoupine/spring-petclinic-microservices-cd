@@ -13,7 +13,7 @@ pipeline {
     }
 
     environment {
-        DOCKERHUB_USERNAME = credentials('dockerhub-credentials').usr
+        DOCKERHUB_USERNAME = "matoupine"
         HELM_RELEASE_NAME = "petclinic"
         NAMESPACE = "default"
     }
