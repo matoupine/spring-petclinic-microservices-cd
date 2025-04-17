@@ -62,17 +62,21 @@ pipeline {
         stage('Deploy via Helm') {
             steps {
                 script {
-                    def helmValues = IMAGE_TAGS.collect { service, tag ->
-                        def key = service.replace('-service', '').replace('-', '')
-                        "services[?(@.name==\"${service}\")].image=${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}"
-                    }.join(',')
+                    def overrideYaml = """
+                    services:
+                    """
+                                IMAGE_TAGS.each { service, tag ->
+                                    overrideYaml += """  - name: ${service}
+                        image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}
+                    """
+                    }
 
-                    echo "🚀 Deploying with Helm values override..."
+                    writeFile file: 'values.override.yaml', text: overrideYaml
 
                     sh """
-                    helm upgrade --install ${HELM_RELEASE_NAME} ./helm-chart \
-                      --namespace ${NAMESPACE} \
-                      --set-string ${helmValues}
+                        helm upgrade --install ${HELM_RELEASE_NAME} ./helm-chart \
+                            --namespace ${NAMESPACE} \
+                            -f values.override.yaml
                     """
                 }
             }
