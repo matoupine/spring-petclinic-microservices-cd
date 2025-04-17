@@ -14,7 +14,7 @@ pipeline {
 
   environment {
     DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
-    DOCKERHUB_REPO = 'matoupine' =
+    DOCKERHUB_REPO = 'matoupine'
     KUBE_NAMESPACE = 'petclinic-dev'
   }
 
