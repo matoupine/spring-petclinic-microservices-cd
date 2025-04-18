@@ -63,20 +63,20 @@ pipeline {
                     sh "rm -rf gitops"
                     sh "git clone ${GITOPS_REPO} gitops"
 
-                    // Construct values.yaml path
-                    def valuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
-                    def repoValuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                    // Construct values.yaml paths
+                    def workspaceValuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                    def repoValuesPath = "overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
 
                     // Verify the overlays directory exists, create if missing
-                    def overlaysDir = "gitops/gitops/overlays/${params.ENVIRONMENT}"
+                    def overlaysDir = "gitops/overlays/${params.ENVIRONMENT}"
                     sh "mkdir -p ${overlaysDir}"
 
                     // Debug: Check existing file content if it exists
-                    if (fileExists(valuesPath)) {
-                        def existingContent = readFile(valuesPath)
+                    if (fileExists(workspaceValuesPath)) {
+                        def existingContent = readFile(workspaceValuesPath)
                         echo "📄 Existing values.yaml content:\n${existingContent}"
                     } else {
-                        echo "⚠️ No existing values.yaml found at ${valuesPath}. Creating new file."
+                        echo "⚠️ No existing values.yaml found at ${workspaceValuesPath}. Creating new file."
                     }
 
                     // Start building YAML content with all fields
@@ -123,10 +123,10 @@ autoscaling:
                     echo "📄 Generated YAML for ${params.ENVIRONMENT}:\n${valuesContent}"
 
                     // Write the new values file
-                    writeFile file: valuesPath, text: valuesContent
+                    writeFile file: workspaceValuesPath, text: valuesContent
 
                     // Debug: Verify written file content
-                    def writtenContent = readFile(valuesPath)
+                    def writtenContent = readFile(workspaceValuesPath)
                     echo "📝 Written values.yaml content:\n${writtenContent}"
 
                     // Commit and push changes if needed
@@ -168,6 +168,4 @@ autoscaling:
             echo "❌ CD process failed."
         }
     }
-
-    // add some comment
 }
