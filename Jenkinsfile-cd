@@ -66,23 +66,22 @@ pipeline {
                     // Construct values.yaml path
                     def valuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
 
-                    // Read and parse the existing values.yaml
-                    def yamlSlurper = new groovy.yaml.YamlSlurper()
+                    // Read the existing values.yaml file
                     def valuesContent = readFile(valuesPath)
-                    def values = yamlSlurper.parseText(valuesContent)
 
                     // Update image tags for each service
                     IMAGE_TAGS.each { service, tag ->
-                        values.services.find { it.name == service }.image = "${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}"
+                        def oldImageLine = valuesContent.find(/^\s*image:\s*${DOCKERHUB_USERNAME}\/spring-petclinic-${service}:.*/);
+                        def newImageLine = "    image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}"
+                        if (oldImageLine) {
+                            valuesContent = valuesContent.replaceFirst(oldImageLine, newImageLine)
+                        } else {
+                            error "❌ Could not find image line for service '${service}' in ${valuesPath}"
+                        }
                     }
 
-                    // Convert back to YAML
-                    def yamlBuilder = new groovy.yaml.YamlBuilder()
-                    yamlBuilder.call(values)
-                    def updatedValuesContent = yamlBuilder.toString()
-
                     // Write the updated values file
-                    writeFile file: valuesPath, text: updatedValuesContent
+                    writeFile file: valuesPath, text: valuesContent
 
                     // Commit and push changes if needed
                     dir('gitops') {
