@@ -64,11 +64,20 @@ pipeline {
                     sh "git clone ${GITOPS_REPO} gitops"
 
                     // Construct values.yaml path
-                    def valuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                    def valuesPath = "overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                    def fullValuesPath = "gitops/${valuesPath}"
 
                     // Verify the overlays directory exists, create if missing
                     def overlaysDir = "gitops/overlays/${params.ENVIRONMENT}"
                     sh "mkdir -p ${overlaysDir}"
+
+                    // Debug: Check existing file content if it exists
+                    if (fileExists(fullValuesPath)) {
+                        def existingContent = readFile(fullValuesPath)
+                        echo "📄 Existing values.yaml content:\n${existingContent}"
+                    } else {
+                        echo "⚠️ No existing values.yaml found at ${fullValuesPath}. Creating new file."
+                    }
 
                     // Start building YAML content with all fields
                     def valuesContent = """# PetClinic values for ${params.ENVIRONMENT} environment
@@ -114,7 +123,11 @@ autoscaling:
                     echo "📄 Generated YAML for ${params.ENVIRONMENT}:\n${valuesContent}"
 
                     // Write the new values file
-                    writeFile file: valuesPath, text: valuesContent
+                    writeFile file: fullValuesPath, text: valuesContent
+
+                    // Debug: Verify written file content
+                    def writtenContent = readFile(fullValuesPath)
+                    echo "📝 Written values.yaml content:\n${writtenContent}"
 
                     // Commit and push changes if needed
                     dir('gitops') {
@@ -124,7 +137,9 @@ autoscaling:
                             sh """
                                 git config user.email "imanhhuy007@gmail.com"
                                 git config user.name "anhhuy007"
+                                git status
                                 git add ${valuesPath}
+                                git diff --cached
                                 git diff --cached --quiet || git commit -m "Update ${params.ENVIRONMENT} environment with new image tags"
                                 git push ${safeRepo} ${GITOPS_BRANCH}
                             """
