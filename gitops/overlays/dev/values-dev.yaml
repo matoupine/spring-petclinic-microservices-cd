@@ -28,3 +28,7 @@ services:
 service:
   type: NodePort
   nodePort: 30080
+
+serviceAccount:
+  create: true
+  name: ""
