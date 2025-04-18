@@ -39,7 +39,7 @@ pipeline {
 
                     services.each { service, branch ->
                         def commit = sh(
-                            script: "git ls-remote origin refs/heads/${branch} | cut -c1-7",
+                            script: "git ls-remote ${GITOPS_REPO} refs/heads/${branch} | cut -c1-7",
                             returnStdout: true
                         ).trim()
 
@@ -49,7 +49,6 @@ pipeline {
 
                         IMAGE_TAGS[service] = commit
                     }
-
 
                     echo "📦 Image tags to be used:"
                     IMAGE_TAGS.each { k, v -> echo " - ${k}: ${v}" }
@@ -67,33 +66,28 @@ pipeline {
                     // Construct values.yaml path
                     def valuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
 
-                    // Start building YAML content
-                    def valuesContent = """replicaCount: 1
+                    // Read and parse the existing values.yaml
+                    def yamlSlurper = new groovy.yaml.YamlSlurper()
+                    def valuesContent = readFile(valuesPath)
+                    def values = yamlSlurper.parseText(valuesContent)
 
-services:
-"""
-
+                    // Update image tags for each service
                     IMAGE_TAGS.each { service, tag ->
-                        valuesContent += """  - name: ${service}
-    image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}
-"""
+                        values.services.find { it.name == service }.image = "${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}"
                     }
 
-                    valuesContent += """
-service:
-  type: NodePort
-  nodePort: 30080
-"""
+                    // Convert back to YAML
+                    def yamlBuilder = new groovy.yaml.YamlBuilder()
+                    yamlBuilder.call(values)
+                    def updatedValuesContent = yamlBuilder.toString()
 
-                    echo "📄 Generated YAML for ${params.ENVIRONMENT}:\n${valuesContent}"
-
-                    // Write the new values file
-                    writeFile file: valuesPath, text: valuesContent
+                    // Write the updated values file
+                    writeFile file: valuesPath, text: updatedValuesContent
 
                     // Commit and push changes if needed
                     dir('gitops') {
                         withCredentials([usernamePassword(credentialsId: GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                            def safeRepo = GITOPS_REPO.replace("https://", "https://" + GIT_USERNAME + ":" + GIT_PASSWORD + "@")
+                            def safeRepo = GITOPS_REPO.replace("https://", "https://${GIT_USERNAME}:${GIT_PASSWORD}@")
 
                             sh """
                                 git config user.email "imanhhuy007@gmail.com"
