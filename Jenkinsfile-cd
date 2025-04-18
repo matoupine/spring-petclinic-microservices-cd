@@ -38,9 +38,7 @@ pipeline {
                     IMAGE_TAGS = [:]
 
                     services.each { service, branch ->
-                        if (branch == 'main') {
-                            IMAGE_TAGS[service] = "main"
-                        } else {
+                        {
                             def commit = sh(
                                 script: "git ls-remote origin refs/heads/${branch} | cut -c1-7",
                                 returnStdout: true
