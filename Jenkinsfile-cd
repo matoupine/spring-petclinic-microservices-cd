@@ -62,18 +62,9 @@ pipeline {
         stage('Deploy via Helm') {
             steps {
                 script {
-                    def overrideYaml = """
-                    services:
-                    """
-                                IMAGE_TAGS.each { service, tag ->
-                                    overrideYaml += """  - name: ${service}
-                        image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}
-                    """
-                    }
-
-                    writeFile file: 'values.override.yaml', text: overrideYaml
-
+                    // Similar code as before, then:
                     sh """
+                        export KUBECONFIG=/path/to/accessible/kubeconfig
                         helm upgrade --install ${HELM_RELEASE_NAME} ./helm-chart \
                             --namespace ${NAMESPACE} \
                             -f values.override.yaml
