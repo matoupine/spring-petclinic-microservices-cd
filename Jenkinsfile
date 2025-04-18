@@ -4,13 +4,14 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-credentials')
         SERVICES = "customers-service visits-service vets-service genai-service admin-server config-server api-gateway discovery-server"
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'unknown'}"
     }
 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
-                echo "✅ Checked out source code."
+                echo "✅ Checked out source code from branch: ${BRANCH_NAME}"
             }
         }
 
