@@ -47,14 +47,14 @@ pipeline {
                             ).trim()
 
                             if (!commit) {
-                                error "❌ Branch ${branch} not found for service ${service}"
+                                error "❌ Cannot find branch '${branch}' for service '${service}'"
                             }
 
                             IMAGE_TAGS[service] = commit
                         }
                     }
 
-                    echo "📦 Image tags:"
+                    echo "📦 Image tags to be used:"
                     IMAGE_TAGS.each { k, v -> echo " - ${k}: ${v}" }
                 }
             }
@@ -63,43 +63,47 @@ pipeline {
         stage('Update GitOps Repository') {
             steps {
                 script {
+                    // Clone the GitOps repo
                     sh "rm -rf gitops"
                     sh "git clone ${GITOPS_REPO} gitops"
 
-                    dir('gitops') {
-                        def valuesPath = "overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                    // Construct values.yaml path
+                    def valuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
 
-                        def valuesContent = """
-replicaCount: 1
+                    // Start building YAML content
+                    def valuesContent = """replicaCount: 1
 
 services:
 """
 
-                        IMAGE_TAGS.each { service, tag ->
-                            valuesContent += """  - name: ${service}
+                    IMAGE_TAGS.each { service, tag ->
+                        valuesContent += """  - name: ${service}
     image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}
 """
-                        }
+                    }
 
-                        valuesContent += """
+                    valuesContent += """
 service:
   type: NodePort
   nodePort: 30080
 """
 
-                        echo "📄 Final values file content:"
-                        echo valuesContent
+                    echo "📄 Generated YAML for ${params.ENVIRONMENT}:\n${valuesContent}"
 
-                        writeFile file: valuesPath, text: valuesContent
+                    // Write the new values file
+                    writeFile file: valuesPath, text: valuesContent
 
+                    // Commit and push changes if needed
+                    dir('gitops') {
                         withCredentials([usernamePassword(credentialsId: GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
-                            def gitRepoWithCreds = GITOPS_REPO.replace("https://", "https://${GIT_USERNAME}:${GIT_PASSWORD}@")
+                            def safeRepo = GITOPS_REPO.replace("https://", "https://" + GIT_USERNAME + ":" + GIT_PASSWORD + "@")
+
                             sh """
                                 git config user.email "imanhhuy007@gmail.com"
                                 git config user.name "anhhuy007"
                                 git add ${valuesPath}
-                                git commit -m "Update ${params.ENVIRONMENT} environment with new image tags"
-                                git push ${gitRepoWithCreds} ${GITOPS_BRANCH}
+                                git diff --cached --quiet || git commit -m "Update ${params.ENVIRONMENT} environment with new image tags"
+                                git push ${safeRepo} ${GITOPS_BRANCH}
                             """
                         }
                     }
@@ -110,9 +114,9 @@ service:
         stage('Show Access Info') {
             steps {
                 script {
-                    echo "🔗 Access the app: http://<WORKER_NODE_IP>:30080"
-                    echo "⚠️ Add domain to /etc/hosts if needed."
-                    echo "🔄 ArgoCD will sync and deploy changes automatically."
+                    echo "🔗 Access app at: http://<WORKER_NODE_IP>:30080"
+                    echo "⚠️ Add domain to /etc/hosts manually if needed."
+                    echo "🔄 ArgoCD will automatically detect and apply changes."
                 }
             }
         }
@@ -120,10 +124,10 @@ service:
 
     post {
         success {
-            echo "✅ CD pipeline completed successfully!"
+            echo "✅ CD Pipeline completed. ArgoCD is synced."
         }
         failure {
-            echo "❌ CD pipeline failed."
+            echo "❌ CD process failed."
         }
     }
 }
