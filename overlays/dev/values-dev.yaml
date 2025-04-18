@@ -1,0 +1,24 @@
+
+replicaCount: 1
+
+services:
+  - name: customers-service
+    image: matoupine/spring-petclinic-customers-service:main
+  - name: visits-service
+    image: matoupine/spring-petclinic-visits-service:main
+  - name: vets-service
+    image: matoupine/spring-petclinic-vets-service:main
+  - name: genai-service
+    image: matoupine/spring-petclinic-genai-service:main
+  - name: admin-server
+    image: matoupine/spring-petclinic-admin-server:main
+  - name: config-server
+    image: matoupine/spring-petclinic-config-server:main
+  - name: api-gateway
+    image: matoupine/spring-petclinic-api-gateway:main
+  - name: discovery-server
+    image: matoupine/spring-petclinic-discovery-server:main
+
+service:
+  type: NodePort
+  nodePort: 30080
