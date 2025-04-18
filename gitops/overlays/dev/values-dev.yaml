@@ -32,3 +32,6 @@ service:
 serviceAccount:
   create: true
   name: ""
+
+ingress:
+  enabled: false
