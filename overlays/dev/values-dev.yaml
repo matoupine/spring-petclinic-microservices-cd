@@ -1,28 +1,28 @@
 # PetClinic values for dev environment
 services:
   - name: customers-service
-    image: matoupine/spring-petclinic-customers-service:cde80cd
+    image: matoupine/spring-petclinic-customers-service:d6a583f
     port: 8081
   - name: visits-service
-    image: matoupine/spring-petclinic-visits-service:cde80cd
+    image: matoupine/spring-petclinic-visits-service:d6a583f
     port: 8084
   - name: vets-service
-    image: matoupine/spring-petclinic-vets-service:cde80cd
+    image: matoupine/spring-petclinic-vets-service:d6a583f
     port: 8083
   - name: genai-service
-    image: matoupine/spring-petclinic-genai-service:cde80cd
+    image: matoupine/spring-petclinic-genai-service:d6a583f
     port: 8082
   - name: admin-server
-    image: matoupine/spring-petclinic-admin-server:cde80cd
+    image: matoupine/spring-petclinic-admin-server:d6a583f
     port: 9100
   - name: config-server
-    image: matoupine/spring-petclinic-config-server:cde80cd
+    image: matoupine/spring-petclinic-config-server:d6a583f
     port: 8888
   - name: api-gateway
-    image: matoupine/spring-petclinic-api-gateway:cde80cd
+    image: matoupine/spring-petclinic-api-gateway:d6a583f
     port: 8080
   - name: discovery-server
-    image: matoupine/spring-petclinic-discovery-server:cde80cd
+    image: matoupine/spring-petclinic-discovery-server:d6a583f
     port: 8761
 
 service:
