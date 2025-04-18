@@ -41,21 +41,20 @@ pipeline {
                         if (branch == 'main') {
                             IMAGE_TAGS[service] = "main"
                         } else {
-                            // Fetch commit ID from remote branch
                             def commit = sh(
                                 script: "git ls-remote origin refs/heads/${branch} | cut -c1-7",
                                 returnStdout: true
                             ).trim()
 
                             if (!commit) {
-                                error "❌ Không tìm thấy branch ${branch} cho service ${service}"
+                                error "❌ Branch ${branch} not found for service ${service}"
                             }
 
                             IMAGE_TAGS[service] = commit
                         }
                     }
 
-                    echo "📦 Image tags will be used:"
+                    echo "📦 Image tags:"
                     IMAGE_TAGS.each { k, v -> echo " - ${k}: ${v}" }
                 }
             }
@@ -64,47 +63,41 @@ pipeline {
         stage('Update GitOps Repository') {
             steps {
                 script {
-                    // Clone the GitOps repository
                     sh "rm -rf gitops"
                     sh "git clone ${GITOPS_REPO} gitops"
 
-                    def valuesContent = """
+                    dir('gitops') {
+                        def valuesPath = "overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+
+                        def valuesContent = """
 replicaCount: 1
 
 services:
 """
 
-                    IMAGE_TAGS.each { service, tag ->
-                        valuesContent += """  - name: ${service}
+                        IMAGE_TAGS.each { service, tag ->
+                            valuesContent += """  - name: ${service}
     image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}
 """
-                    }
+                        }
 
-                    valuesContent += """
+                        valuesContent += """
 service:
   type: NodePort
   nodePort: 30080
 """
 
-                    // Echo the generated values content for debugging
-                    echo "📄 Generated values content:"
-                    echo valuesContent
+                        echo "📄 Final values file content:"
+                        echo valuesContent
 
-                    // Write the values content to the file
-                    dir('gitops') {
-                        def valuesPath = "overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
                         writeFile file: valuesPath, text: valuesContent
-                    }
 
-                    // Commit and push the changes
-                    dir('gitops') {
                         withCredentials([usernamePassword(credentialsId: GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
                             def gitRepoWithCreds = GITOPS_REPO.replace("https://", "https://${GIT_USERNAME}:${GIT_PASSWORD}@")
-
                             sh """
                                 git config user.email "imanhhuy007@gmail.com"
                                 git config user.name "anhhuy007"
-                                git add .
+                                git add ${valuesPath}
                                 git commit -m "Update ${params.ENVIRONMENT} environment with new image tags"
                                 git push ${gitRepoWithCreds} ${GITOPS_BRANCH}
                             """
@@ -117,9 +110,9 @@ service:
         stage('Show Access Info') {
             steps {
                 script {
-                    echo "🔗 After deployment, access at: http://<WORKER_NODE_IP>:30080"
-                    echo "⚠️ Please add domain manually in /etc/hosts if needed."
-                    echo "🔄 ArgoCD will automatically sync and deploy the changes."
+                    echo "🔗 Access the app: http://<WORKER_NODE_IP>:30080"
+                    echo "⚠️ Add domain to /etc/hosts if needed."
+                    echo "🔄 ArgoCD will sync and deploy changes automatically."
                 }
             }
         }
@@ -127,10 +120,10 @@ service:
 
     post {
         success {
-            echo "✅ CD Pipeline completed. ArgoCD has been updated."
+            echo "✅ CD pipeline completed successfully!"
         }
         failure {
-            echo "❌ There was an error in the CD process."
+            echo "❌ CD pipeline failed."
         }
     }
 }
