@@ -66,21 +66,54 @@ pipeline {
                     // Construct values.yaml path
                     def valuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
 
-                    // Read the existing values.yaml file
-                    def valuesContent = readFile(valuesPath)
+                    // Verify the overlays directory exists, create if missing
+                    def overlaysDir = "gitops/overlays/${params.ENVIRONMENT}"
+                    sh "mkdir -p ${overlaysDir}"
 
-                    // Update image tags for each service
+                    // Start building YAML content with all fields
+                    def valuesContent = """# PetClinic values for ${params.ENVIRONMENT} environment
+services:
+"""
+
+                    // Hard-code each service with its port and updated image tag
                     IMAGE_TAGS.each { service, tag ->
-                        def oldImageLine = valuesContent.find(/^\s*image:\s*${DOCKERHUB_USERNAME}\/spring-petclinic-${service}:.*/);
-                        def newImageLine = "    image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}"
-                        if (oldImageLine) {
-                            valuesContent = valuesContent.replaceFirst(oldImageLine, newImageLine)
-                        } else {
-                            error "❌ Could not find image line for service '${service}' in ${valuesPath}"
-                        }
+                        def port = service == 'customers-service' ? 8081 :
+                                  service == 'visits-service' ? 8084 :
+                                  service == 'vets-service' ? 8083 :
+                                  service == 'genai-service' ? 8082 :
+                                  service == 'admin-server' ? 9100 :
+                                  service == 'config-server' ? 8888 :
+                                  service == 'api-gateway' ? 8080 :
+                                  service == 'discovery-server' ? 8761 : 8080
+                        valuesContent += """  - name: ${service}
+    image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}
+    port: ${port}
+"""
                     }
 
-                    // Write the updated values file
+                    // Add the remaining fields from the original values.yaml
+                    valuesContent += """
+service:
+  type: NodePort
+  nodePort: 30080
+
+serviceAccount:
+  create: true
+  name: ""
+
+ingress:
+  enabled: false
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+"""
+
+                    echo "📄 Generated YAML for ${params.ENVIRONMENT}:\n${valuesContent}"
+
+                    // Write the new values file
                     writeFile file: valuesPath, text: valuesContent
 
                     // Commit and push changes if needed
