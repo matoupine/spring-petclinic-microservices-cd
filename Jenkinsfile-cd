@@ -10,7 +10,7 @@ pipeline {
         string(name: 'BRANCH_CONFIG', defaultValue: 'main', description: 'Branch for config-server')
         string(name: 'BRANCH_GATEWAY', defaultValue: 'main', description: 'Branch for api-gateway')
         string(name: 'BRANCH_DISCOVERY', defaultValue: 'main', description: 'Branch for discovery-server')
-        string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev or staging)')
+        // 🧹 Removed ENVIRONMENT param
     }
 
     environment {
@@ -21,6 +21,26 @@ pipeline {
     }
 
     stages {
+        stage('Detect Environment') {
+            steps {
+                script {
+                    // 🆕 Auto-detect environment
+                    def gitTag = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
+                    echo "🔍 Git Tag: ${gitTag}"
+
+                    if (gitTag ==~ /^v\\d+\\.\\d+\\.\\d+$/) {
+                        env.ENVIRONMENT = 'staging'
+                        echo "🚀 Detected release tag '${gitTag}' — deploying to STAGING"
+                        env.IMAGE_TAG_SUFFIX = gitTag
+                    } else {
+                        env.ENVIRONMENT = 'dev'
+                        echo "🛠 No release tag found — deploying to DEV"
+                        env.IMAGE_TAG_SUFFIX = "latest"
+                    }
+                }
+            }
+        }
+
         stage('Generate Image Tags') {
             steps {
                 script {
@@ -38,21 +58,15 @@ pipeline {
                     IMAGE_TAGS = [:]
 
                     services.each { service, branch ->
-                        if (branch == 'main') {
-                            IMAGE_TAGS[service] = 'latest'
-                        }
-                        else {
-                            def commit = sh(
-                                script: "git ls-remote ${GITOPS_REPO} refs/heads/${branch} | cut -c1-7",
-                                returnStdout: true
-                            ).trim()
+                        def tag = env.IMAGE_TAG_SUFFIX == 'latest' ?
+                            sh(script: "git ls-remote ${GITOPS_REPO} refs/heads/${branch} | cut -c1-7", returnStdout: true).trim() :
+                            env.IMAGE_TAG_SUFFIX
 
-                            if (!commit) {
-                                error "❌ Cannot find branch '${branch}' for service '${service}'"
-                            }
-
-                            IMAGE_TAGS[service] = commit
+                        if (!tag) {
+                            error "❌ Cannot find valid tag/commit for '${service}'"
                         }
+
+                        IMAGE_TAGS[service] = tag
                     }
 
                     echo "📦 Image tags to be used:"
@@ -64,32 +78,17 @@ pipeline {
         stage('Update GitOps Repository') {
             steps {
                 script {
-                    // Clone the GitOps repo
                     sh "rm -rf gitops"
                     sh "git clone ${GITOPS_REPO} gitops"
 
-                    // Construct values.yaml path
-                    def valuesPath = "overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                    def valuesPath = "overlays/${env.ENVIRONMENT}/values-${env.ENVIRONMENT}.yaml"
                     def fullValuesPath = "gitops/${valuesPath}"
-
-                    // Verify the overlays directory exists, create if missing
-                    def overlaysDir = "gitops/overlays/${params.ENVIRONMENT}"
+                    def overlaysDir = "gitops/overlays/${env.ENVIRONMENT}"
                     sh "mkdir -p ${overlaysDir}"
 
-                    // Debug: Check existing file content if it exists
-                    if (fileExists(fullValuesPath)) {
-                        def existingContent = readFile(fullValuesPath)
-                        echo "📄 Existing values.yaml content:\n${existingContent}"
-                    } else {
-                        echo "⚠️ No existing values.yaml found at ${fullValuesPath}. Creating new file."
-                    }
-
-                    // Start building YAML content with all fields
-                    def valuesContent = """# PetClinic values for ${params.ENVIRONMENT} environment
+                    def valuesContent = """# PetClinic values for ${env.ENVIRONMENT} environment
 services:
 """
-
-                    // Hard-code each service with its port and updated image tag
                     IMAGE_TAGS.each { service, tag ->
                         def port = service == 'customers-service' ? 8081 :
                                   service == 'visits-service' ? 8084 :
@@ -105,7 +104,6 @@ services:
 """
                     }
 
-                    // Add the remaining fields from the original values.yaml
                     valuesContent += """
 service:
   type: NodePort
@@ -125,27 +123,16 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
 """
 
-                    echo "📄 Generated YAML for ${params.ENVIRONMENT}:\n${valuesContent}"
-
-                    // Write the new values file
                     writeFile file: fullValuesPath, text: valuesContent
 
-                    // Debug: Verify written file content
-                    def writtenContent = readFile(fullValuesPath)
-                    echo "📝 Written values.yaml content:\n${writtenContent}"
-
-                    // Commit and push changes if needed
                     dir('gitops') {
                         withCredentials([usernamePassword(credentialsId: GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
                             def safeRepo = GITOPS_REPO.replace("https://", "https://${GIT_USERNAME}:${GIT_PASSWORD}@")
-
                             sh """
                                 git config user.email "imanhhuy007@gmail.com"
                                 git config user.name "anhhuy007"
-                                git status
                                 git add ${valuesPath}
-                                git diff --cached
-                                git diff --cached --quiet || git commit -m "Update ${params.ENVIRONMENT} environment with new image tags"
+                                git diff --cached --quiet || git commit -m "Update ${env.ENVIRONMENT} with new image tags: ${env.IMAGE_TAG_SUFFIX}"
                                 git push ${safeRepo} ${GITOPS_BRANCH}
                             """
                         }
@@ -158,8 +145,6 @@ autoscaling:
             steps {
                 script {
                     echo "🔗 Access app at: http://<WORKER_NODE_IP>:30080"
-                    echo "⚠️ Add domain to /etc/hosts manually if needed."
-                    echo "🔄 ArgoCD will automatically detect and apply changes."
                 }
             }
         }
