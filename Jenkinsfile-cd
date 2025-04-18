@@ -65,11 +65,11 @@ pipeline {
             steps {
                 script {
                     // Clone the GitOps repository
-                    sh "rm -rf gitops-repo"
-                    sh "git clone ${GITOPS_REPO} gitops-repo"
+                    sh "rm -rf gitops"
+                    sh "git clone ${GITOPS_REPO} gitops"
 
                     // Build updated YAML values
-                    def valuesPath = "gitops-repo/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                    def valuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
 
                     def valuesContent = """
 replicaCount: 1
@@ -96,7 +96,7 @@ service:
                     writeFile file: valuesPath, text: valuesContent
 
                     // Commit and push the changes
-                    dir('gitops-repo') {
+                    dir('gitops') {
                         withCredentials([usernamePassword(credentialsId: GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
                             def gitRepoWithCreds = GITOPS_REPO.replace("https://", "https://${GIT_USERNAME}:${GIT_PASSWORD}@")
 
