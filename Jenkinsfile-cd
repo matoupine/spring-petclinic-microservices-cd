@@ -38,19 +38,18 @@ pipeline {
                     IMAGE_TAGS = [:]
 
                     services.each { service, branch ->
-                        {
-                            def commit = sh(
-                                script: "git ls-remote origin refs/heads/${branch} | cut -c1-7",
-                                returnStdout: true
-                            ).trim()
+                        def commit = sh(
+                            script: "git ls-remote origin refs/heads/${branch} | cut -c1-7",
+                            returnStdout: true
+                        ).trim()
 
-                            if (!commit) {
-                                error "❌ Cannot find branch '${branch}' for service '${service}'"
-                            }
-
-                            IMAGE_TAGS[service] = commit
+                        if (!commit) {
+                            error "❌ Cannot find branch '${branch}' for service '${service}'"
                         }
+
+                        IMAGE_TAGS[service] = commit
                     }
+
 
                     echo "📦 Image tags to be used:"
                     IMAGE_TAGS.each { k, v -> echo " - ${k}: ${v}" }
