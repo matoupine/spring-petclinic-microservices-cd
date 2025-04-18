@@ -28,7 +28,7 @@ pipeline {
                     def gitTag = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
                     echo "🔍 Git Tag: ${gitTag}"
 
-                    if (gitTag ==~ /v\d+\.\d+\.\d+/)
+                    if (gitTag ==~ /v\d+\.\d+\.\d+/) {
                         env.ENVIRONMENT = 'staging'
                         echo "🚀 Detected release tag '${gitTag}' — deploying to STAGING"
                         env.IMAGE_TAG_SUFFIX = gitTag
