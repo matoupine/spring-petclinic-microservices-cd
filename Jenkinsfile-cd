@@ -68,9 +68,6 @@ pipeline {
                     sh "rm -rf gitops"
                     sh "git clone ${GITOPS_REPO} gitops"
 
-                    // Build updated YAML values
-                    def valuesPath = "gitops/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
-
                     def valuesContent = """
 replicaCount: 1
 
@@ -93,7 +90,11 @@ service:
                     echo "📄 Generated values content:"
                     echo valuesContent
 
-                    writeFile file: valuesPath, text: valuesContent
+                    // Write the values content to the file
+                    dir('gitops') {
+                        def valuesPath = "overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+                        writeFile file: valuesPath, text: valuesContent
+                    }
 
                     // Commit and push the changes
                     dir('gitops') {
