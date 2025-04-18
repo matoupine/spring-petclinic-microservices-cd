@@ -1,0 +1,31 @@
+replicaCount: 1
+
+services:
+  - name: discovery-server
+    image: petclinic-discovery-server:local
+    port: 8761
+  - name: config-server
+    image: petclinic-config-server:local
+    port: 8888
+  - name: admin-server
+    image: petclinic-admin-server:local
+    port: 9100
+  - name: api-gateway
+    image: petclinic-api-gateway:local
+    port: 8080
+  - name: customers-service
+    image: petclinic-customers-service:local
+    port: 8081
+  - name: genai-service
+    image: petclinic-genai-service:local
+    port: 8082
+  - name: vets-service
+    image: petclinic-vets-service:local
+    port: 8083
+  - name: visits-service
+    image: petclinic-visits-service:local
+    port: 8084
+
+service:
+  type: NodePort
+  nodePort: 30080 

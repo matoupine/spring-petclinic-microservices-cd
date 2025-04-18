@@ -10,12 +10,14 @@ pipeline {
         string(name: 'BRANCH_CONFIG', defaultValue: 'main', description: 'Branch for config-server')
         string(name: 'BRANCH_GATEWAY', defaultValue: 'main', description: 'Branch for api-gateway')
         string(name: 'BRANCH_DISCOVERY', defaultValue: 'main', description: 'Branch for discovery-server')
+        string(name: 'ENVIRONMENT', defaultValue: 'dev', description: 'Environment to deploy to (dev or staging)')
     }
 
     environment {
         DOCKERHUB_USERNAME = "matoupine"
-        HELM_RELEASE_NAME = "petclinic"
-        NAMESPACE = "default"
+        GITOPS_REPO = "https://github.com/matoupine/spring-petclinic-microservices-cd.git"
+        GITOPS_BRANCH = "main"
+        GIT_CREDENTIALS_ID = "git-credentials"
     }
 
     stages {
@@ -53,22 +55,60 @@ pipeline {
                         }
                     }
 
-                    echo "📦 Image tags sẽ được sử dụng:"
+                    echo "📦 Image tags will be used:"
                     IMAGE_TAGS.each { k, v -> echo " - ${k}: ${v}" }
                 }
             }
         }
 
-        stage('Deploy via Helm') {
+        stage('Update GitOps Repository') {
             steps {
                 script {
-                    // Similar code as before, then:
-                    sh """
-                        export KUBECONFIG=/path/to/accessible/kubeconfig
-                        helm upgrade --install ${HELM_RELEASE_NAME} ./helm-chart \
-                            --namespace ${NAMESPACE} \
-                            -f values.override.yaml
-                    """
+                    // Clone the GitOps repository
+                    sh "rm -rf gitops-repo"
+                    sh "git clone ${GITOPS_REPO} gitops-repo"
+
+                    // Build updated YAML values
+                    def valuesPath = "gitops-repo/overlays/${params.ENVIRONMENT}/values-${params.ENVIRONMENT}.yaml"
+
+                    def valuesContent = """
+replicaCount: 1
+
+services:
+"""
+
+                    IMAGE_TAGS.each { service, tag ->
+                        valuesContent += """  - name: ${service}
+    image: ${DOCKERHUB_USERNAME}/spring-petclinic-${service}:${tag}
+"""
+                    }
+
+                    valuesContent += """
+service:
+  type: NodePort
+  nodePort: 30080
+"""
+
+                    // Echo the generated values content for debugging
+                    echo "📄 Generated values content:"
+                    echo valuesContent
+
+                    writeFile file: valuesPath, text: valuesContent
+
+                    // Commit and push the changes
+                    dir('gitops-repo') {
+                        withCredentials([usernamePassword(credentialsId: GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                            def gitRepoWithCreds = GITOPS_REPO.replace("https://", "https://${GIT_USERNAME}:${GIT_PASSWORD}@")
+
+                            sh """
+                                git config user.email "imanhhuy007@gmail.com"
+                                git config user.name "anhhuy007"
+                                git add .
+                                git commit -m "Update ${params.ENVIRONMENT} environment with new image tags"
+                                git push ${gitRepoWithCreds} ${GITOPS_BRANCH}
+                            """
+                        }
+                    }
                 }
             }
         }
@@ -76,8 +116,9 @@ pipeline {
         stage('Show Access Info') {
             steps {
                 script {
-                    echo "🔗 Sau khi deploy, truy cập tại: http://<WORKER_NODE_IP>:30080"
-                    echo "⚠️ Hãy thêm domain thủ công trong file /etc/hosts nếu cần."
+                    echo "🔗 After deployment, access at: http://<WORKER_NODE_IP>:30080"
+                    echo "⚠️ Please add domain manually in /etc/hosts if needed."
+                    echo "🔄 ArgoCD will automatically sync and deploy the changes."
                 }
             }
         }
@@ -85,10 +126,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ CD Pipeline hoàn tất."
+            echo "✅ CD Pipeline completed. ArgoCD has been updated."
         }
         failure {
-            echo "❌ Có lỗi xảy ra trong quá trình CD."
+            echo "❌ There was an error in the CD process."
         }
     }
 }
