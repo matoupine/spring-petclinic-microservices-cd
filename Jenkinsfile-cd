@@ -158,7 +158,7 @@ autoscaling:
             steps {
                 script {
                     echo "🔗 Access app at: http://petclinic-${env.ENVIRONMENT}.local:30080"
-                    echo "⚠️ Add '<MINIKUBE_IP> petclinic-${env.ENVIRONMENT}.local' to /etc/hosts."
+                    echo "⚠️ Add '192.168.49.2 petclinic-${env.ENVIRONMENT}.local' to /etc/hosts."
                 }
             }
         }
