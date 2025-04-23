@@ -10,7 +10,6 @@ pipeline {
         string(name: 'BRANCH_CONFIG', defaultValue: 'main', description: 'Branch for config-server')
         string(name: 'BRANCH_GATEWAY', defaultValue: 'main', description: 'Branch for api-gateway')
         string(name: 'BRANCH_DISCOVERY', defaultValue: 'main', description: 'Branch for discovery-server')
-        // 🧹 Removed ENVIRONMENT param
     }
 
     environment {
@@ -24,7 +23,7 @@ pipeline {
         stage('Detect Environment') {
             steps {
                 script {
-                    // 🆕 Auto-detect environment
+                    // Auto-detect environment
                     def gitTag = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
                     echo "🔍 Git Tag: ${gitTag}"
 

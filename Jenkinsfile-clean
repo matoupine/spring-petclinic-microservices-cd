@@ -1,0 +1,82 @@
+pipeline {
+    agent any
+
+    environment {
+        GITOPS_REPO = "https://github.com/matoupine/spring-petclinic-microservices-cd.git"
+        GITOPS_BRANCH = "main"
+        GIT_CREDENTIALS_ID = "git-credentials"
+    }
+
+    stages {
+        stage('Clone GitOps Repository') {
+            steps {
+                script {
+                    // Clean up any existing gitops directory
+                    sh "rm -rf gitops"
+                    // Clone the GitOps repository
+                    sh "git clone ${GITOPS_REPO} gitops"
+                }
+            }
+        }
+
+        stage('Delete Values Files') {
+            steps {
+                script {
+                    // Define the paths to the values files
+                    def devValuesPath = "gitops/overlays/dev/values-dev.yaml"
+                    def stagingValuesPath = "gitops/overlays/staging/values-staging.yaml"
+
+                    // Debug: Check if files exist before deletion
+                    if (fileExists(devValuesPath)) {
+                        echo "📄 Found ${devValuesPath}. Will delete."
+                    } else {
+                        echo "⚠️ ${devValuesPath} does not exist. Skipping deletion."
+                    }
+                    if (fileExists(stagingValuesPath)) {
+                        echo "📄 Found ${stagingValuesPath}. Will delete."
+                    } else {
+                        echo "⚠️ ${stagingValuesPath} does not exist. Skipping deletion."
+                    }
+
+                    // Delete the values files if they exist
+                    sh """
+                        rm -f ${devValuesPath}
+                        rm -f ${stagingValuesPath}
+                    """
+                }
+            }
+        }
+
+        stage('Commit and Push Changes') {
+            steps {
+                dir('gitops') {
+                    withCredentials([usernamePassword(credentialsId: GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USERNAME', passwordVariable: 'GIT_PASSWORD')]) {
+                        script {
+                            def safeRepo = GITOPS_REPO.replace("https://", "https://${GIT_USERNAME}:${GIT_PASSWORD}@")
+
+                            sh """
+                                git config user.email "imanhhuy007@gmail.com"
+                                git config user.name "anhhuy007"
+                                git status
+                                git add overlays/dev/values-dev.yaml || true
+                                git add overlays/staging/values-staging.yaml || true
+                                git diff --cached
+                                git diff --cached --quiet || git commit -m "Clean up dev and staging values files"
+                                git push ${safeRepo} ${GITOPS_BRANCH}
+                            """
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Cleanup job completed. Values files removed from dev and staging."
+        }
+        failure {
+            echo "❌ Cleanup job failed."
+        }
+    }
+}
