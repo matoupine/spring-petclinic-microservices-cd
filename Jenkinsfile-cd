@@ -15,6 +15,7 @@ pipeline {
     environment {
         DOCKERHUB_USERNAME = "matoupine"
         GITOPS_REPO = "https://github.com/matoupine/spring-petclinic-microservices-cd.git"
+        MICRO_SERVICES_REPO = "https://github.com/<YOUR_USERNAME>/spring-petclinic-microservices.git" // Replace with your fork
         GITOPS_BRANCH = "main"
         GIT_CREDENTIALS_ID = "git-credentials"
     }
@@ -23,18 +24,26 @@ pipeline {
         stage('Detect Environment') {
             steps {
                 script {
-                    // Auto-detect environment
+                    // Check current branch
+                    def currentBranch = sh(script: "git rev-parse --abbrev-ref HEAD", returnStdout: true).trim()
+                    echo "🔍 Current Branch: ${currentBranch}"
+
+                    // Check for release tag
                     def gitTag = sh(script: "git describe --tags --exact-match || true", returnStdout: true).trim()
                     echo "🔍 Git Tag: ${gitTag}"
 
                     if (gitTag ==~ /v\d+\.\d+\.\d+/) {
                         env.ENVIRONMENT = 'staging'
-                        echo "🚀 Detected release tag '${gitTag}' — deploying to STAGING"
                         env.IMAGE_TAG_SUFFIX = gitTag
+                        echo "🚀 Detected release tag '${gitTag}' — deploying to STAGING"
+                    } else if (currentBranch == 'main') {
+                        env.ENVIRONMENT = 'dev'
+                        env.IMAGE_TAG_SUFFIX = 'latest'
+                        echo "🛠 Detected main branch — deploying to DEV with :latest tags"
                     } else {
                         env.ENVIRONMENT = 'dev'
-                        echo "🛠 No release tag found — deploying to DEV"
-                        env.IMAGE_TAG_SUFFIX = "latest"
+                        env.IMAGE_TAG_SUFFIX = 'commit'
+                        echo "🛠 Detected non-main branch '${currentBranch}' — deploying to DEV with commit IDs"
                     }
                 }
             }
@@ -57,12 +66,17 @@ pipeline {
                     IMAGE_TAGS = [:]
 
                     services.each { service, branch ->
-                        def tag = env.IMAGE_TAG_SUFFIX == 'latest' ?
-                            sh(script: "git ls-remote ${GITOPS_REPO} refs/heads/${branch} | cut -c1-7", returnStdout: true).trim() :
-                            env.IMAGE_TAG_SUFFIX
-
-                        if (!tag) {
-                            error "❌ Cannot find valid tag/commit for '${service}'"
+                        def tag
+                        if (env.ENVIRONMENT == 'staging') {
+                            tag = env.IMAGE_TAG_SUFFIX // Use release tag (e.g., v1.2.3)
+                        } else if (env.ENVIRONMENT == 'dev' && branch == 'main') {
+                            tag = 'latest' // Use :latest for main branch in dev
+                        } else {
+                            // Fetch commit ID from microservices repository
+                            tag = sh(script: "git ls-remote ${MICRO_SERVICES_REPO} refs/heads/${branch} | cut -c1-7", returnStdout: true).trim()
+                            if (!tag) {
+                                error "❌ Cannot find valid commit for '${service}' on branch '${branch}'"
+                            }
                         }
 
                         IMAGE_TAGS[service] = tag
@@ -131,7 +145,7 @@ autoscaling:
                                 git config user.email "imanhhuy007@gmail.com"
                                 git config user.name "anhhuy007"
                                 git add ${valuesPath}
-                                git diff --cached --quiet || git commit -m "Update ${env.ENVIRONMENT} with new image tags: ${env.IMAGE_TAG_SUFFIX}"
+                                git diff --cached --quiet || git commit -m "Update ${env.ENVIRONMENT} with image tags: ${env.IMAGE_TAG_SUFFIX}"
                                 git push ${safeRepo} ${GITOPS_BRANCH}
                             """
                         }
@@ -143,7 +157,8 @@ autoscaling:
         stage('Show Access Info') {
             steps {
                 script {
-                    echo "🔗 Access app at: http://<WORKER_NODE_IP>:30080"
+                    echo "🔗 Access app at: http://petclinic-${env.ENVIRONMENT}.local:30080"
+                    echo "⚠️ Add '<MINIKUBE_IP> petclinic-${env.ENVIRONMENT}.local' to /etc/hosts."
                 }
             }
         }
